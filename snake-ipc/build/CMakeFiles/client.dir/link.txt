@@ -1,1 +1,0 @@
-/usr/bin/cc CMakeFiles/client.dir/src/common.c.o CMakeFiles/client.dir/src/client.c.o CMakeFiles/client.dir/src/client_main.c.o -o client  -lpthread -lcurses /usr/lib/x86_64-linux-gnu/libform.so 
