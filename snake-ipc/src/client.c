@@ -67,6 +67,27 @@ static int ui_prompt_int(const char* label, int defv) {
   return atoi(buf);
 }
 
+static int ui_prompt_int_without_clear(const char* label, int defv) {
+  echo();
+  nodelay(stdscr, FALSE);
+  curs_set(1);
+
+  //clear();
+  mvprintw(2, 2, "%s (default %d): ", label, defv);
+  refresh();
+
+  char buf[64];
+  memset(buf, 0, sizeof(buf));
+  getnstr(buf, 63);
+
+  noecho();
+  nodelay(stdscr, TRUE);
+  curs_set(0);
+
+  if (buf[0] == '\0') return defv;
+  return atoi(buf);
+}
+
 static void ui_prompt_str(const char* label, char* out, int outsz, const char* defv) {
   echo();
   nodelay(stdscr, FALSE);
@@ -253,7 +274,7 @@ static void draw_game_from_snapshot(const Msg* s, int my_pid) {
 
 
 static int find_port_by_server_pid(int server_pid) {
-  /* cakáme max ~3 sekundy, kým server zapíše PID+port do registry */
+  /* cakï¿½me max ~3 sekundy, kï¿½m server zapï¿½e PID+port do registry */
   for (int tries = 0; tries < 60; tries++) {   // 60 * 50ms = 3000ms
     ServerInfo list[64];
     int n = reg_list(list, 64);
@@ -333,10 +354,10 @@ if (port <= 0) {
         clear();
         mvprintw(2,2,"Dostupne hry:");
         for (int i = 0; i < n; i++) {
-          mvprintw(4+i, 2, "%d) pid=%d port=%d", i+1, list[i].pid, list[i].port);
+          mvprintw(4+i, 2, "%d)  port=%d", i+1, list[i].port);
         }
         refresh();
-        port = ui_prompt_int("Zadaj port (alebo skopiruj z listu)", list[0].port);
+        port = ui_prompt_int_2("Zadaj port", list[0].port);
       } else {
         port = ui_prompt_int("Zadaj port servera", 0);
       }
