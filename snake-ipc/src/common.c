@@ -183,18 +183,12 @@ static int reg_read_all(int fd, ServerInfo out[], int max) {
     if (n >= max) break;
     ServerInfo s;
     memset(&s, 0, sizeof(s));
-    char map[MAP_PATH_MAX];
-    map[0] = '\0';
 
     /* pid port cur max mode world map */
-
-int k = sscanf(line, "%d %d", &s.pid, &s.port);
-if (k == 2) {
-  out[n++] = s;
-}
-
-
-          }
+    int k = sscanf(line, "%d %d\n",
+                   &s.pid, &s.port);
+    if (k >= 2) out[n++] = s;
+  }
 
   fclose(f);
   return n;
@@ -209,9 +203,7 @@ static int reg_write_all(int fd, const ServerInfo in[], int n) {
 
   for (int i = 0; i < n; i++) {
     const ServerInfo* s = &in[i];
-    fprintf(f, "%d %d\n",
-              s->pid, s->port);
-
+    fprintf(f, "%d %d\n", s->pid, s->port);
   }
   fflush(f);
   fclose(f);
@@ -225,27 +217,21 @@ static int is_pid_alive(int pid) {
 }
 
 int reg_add(const ServerInfo* s) {
-  int fd = reg_open_locked(O_RDWR);   // lock nechajte
+  int fd = reg_open_locked(O_RDWR);
   if (fd < 0) return -1;
 
   ServerInfo list[128];
   int n = reg_read_all(fd, list, 128);
   if (n < 0) { reg_close_locked(fd); return -1; }
 
-  int replaced = 0;
+  /* remove same pid if exists */
+  int w = 0;
   for (int i = 0; i < n; i++) {
-    if (list[i].pid == s->pid) {
-      list[i] = *s;        // prepíš na mieste
-      replaced = 1;
-      break;
-    }
+    if (list[i].pid != s->pid) list[w++] = list[i];
   }
-  if (!replaced) {
-    if (n < 128) list[n++] = *s;   // pridaj len ked neexistoval
-    else { reg_close_locked(fd); return -1; }
-  }
+  if (w < 128) list[w++] = *s;
 
-  int rc = reg_write_all(fd, list, n);
+  int rc = reg_write_all(fd, list, w);
   reg_close_locked(fd);
   return rc;
 }
@@ -276,10 +262,12 @@ int reg_list(ServerInfo out[], int max) {
   int n = reg_read_all(fd, list, 256);
   if (n < 0) { reg_close_locked(fd); return -1; }
 
+  /* prune dead while reading */
   int w = 0;
   for (int i = 0; i < n; i++) {
     if (is_pid_alive(list[i].pid)) list[w++] = list[i];
   }
+  reg_write_all(fd, list, w);
 
   int outn = (w < max) ? w : max;
   for (int i = 0; i < outn; i++) out[i] = list[i];
