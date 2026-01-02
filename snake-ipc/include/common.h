@@ -5,7 +5,7 @@
 #define NAME_MAX_LEN 16
 #define MAP_PATH_MAX 128
 
-#define REGISTRY_PATH "../res/snake_ipc_registry.txt"
+#define REGISTRY_PATH "../rec/snake_ipc_registry.txt"
 
 /* Max rozmery na prenos board snapshotu (dá sa upraviť) */
 #define MAX_W 120

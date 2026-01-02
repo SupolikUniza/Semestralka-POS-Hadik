@@ -1,4 +1,7 @@
-#include "server.h"
+#include "../include/server.h"
+
+#include <sys/socket.h>
+
 
 #include <errno.h>
 #include <stdio.h>
@@ -7,7 +10,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/time.h>
-#include <sys/socket.h>
 
 static int idx(int x, int y, int w) { return y * w + x; }
 
@@ -357,7 +359,6 @@ static void registry_update(Game* g) {
   s.port = g->port;
   reg_add(&s);
 }
-
 static void handle_join(Game* g, int fd, const Msg* m) {
   (void)m;
   if (current_players(g) >= g->max_players) {
@@ -404,7 +405,7 @@ static void handle_join(Game* g, int fd, const Msg* m) {
   memcpy(ok.data, &pid, sizeof(int));
   net_send_msg(fd, &ok);
 
-  registry_update(g);
+  //registry_update(g);
 }
 
 static void handle_input(Game* g, int pid, int dir) {
@@ -443,7 +444,7 @@ static void handle_leave(Game* g, int pid) {
   g->players[pid].alive = 0;
   g->snakes[pid].used = 0;
 
-  registry_update(g);
+  //registry_update(g);
 }
 
 static void handle_respawn(Game* g, int pid) {
@@ -530,11 +531,11 @@ int server_run(int w, int h, int mode, int time_s, int world_type, const char* m
   tv.tv_usec = 20000;
   setsockopt(g.listenfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
-  ServerInfo si;
-  memset(&si, 0, sizeof(si));
-  si.pid = getpid();
-  si.port = g.port;
-  reg_add(&si);
+ ServerInfo si;
+memset(&si, 0, sizeof(si));
+si.pid = getpid();
+si.port = g.port;
+reg_add(&si);
 
   srand((unsigned int)(now_ms() ^ (long)getpid()));
 
@@ -599,7 +600,7 @@ int server_run(int w, int h, int mode, int time_s, int world_type, const char* m
     if (t - last_snap >= 100) {
       broadcast_snapshot(&g);
       last_snap = t;
-      registry_update(&g);
+      //registry_update(&g);
     }
 
     sleep_ms(30);

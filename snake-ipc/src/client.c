@@ -88,16 +88,17 @@ static void ui_prompt_str(const char* label, char* out, int outsz, const char* d
   else strncpy(out, buf, (size_t)outsz - 1);
 }
 
-static int spawn_server_process(int w, int h, int mode, int time_s, int world, const char* map_path, int maxp, int portId) {
+static int spawn_server_process(int w, int h, int mode, int time_s, int world, const char* map_path, int maxp, int* out_server_pid) {
   pid_t pid = fork();
   if (pid < 0) return -1;
+
   if (pid == 0) {
     char sw[32], sh[32], smode[32], stime[32], sworld[32], smax[32], sport[32];
     snprintf(sw, sizeof(sw), "%d", w);
     snprintf(sh, sizeof(sh), "%d", h);
     snprintf(stime, sizeof(stime), "%d", time_s);
     snprintf(smax, sizeof(smax), "%d", maxp);
-    snprintf(sport, sizeof(sport), "%d", portId);
+    snprintf(sport, sizeof(sport), "%d", 0);
     snprintf(smode, sizeof(smode), "%s", (mode == TIMED) ? "timed" : "standard");
     snprintf(sworld, sizeof(sworld), "%s", (world == OBS_FILE) ? "obs_file" : "no_obs");
 
@@ -121,8 +122,12 @@ static int spawn_server_process(int w, int h, int mode, int time_s, int world, c
             "--port", sport,
             (char*)NULL);
     }
+
     _exit(1);
   }
+
+  /* parent */
+  if (out_server_pid) *out_server_pid = (int)pid;
   return 0;
 }
 
@@ -244,6 +249,29 @@ static void draw_game_from_snapshot(const Msg* s, int my_pid) {
   refresh();
 }
 
+
+
+
+static int find_port_by_server_pid(int server_pid) {
+  /* cakáme max ~3 sekundy, kým server zapíše PID+port do registry */
+  for (int tries = 0; tries < 60; tries++) {   // 60 * 50ms = 3000ms
+    ServerInfo list[64];
+    int n = reg_list(list, 64);
+    if (n > 0) {
+      for (int i = 0; i < n; i++) {
+        if (list[i].pid == server_pid && list[i].port > 0) {
+          return list[i].port;
+        }
+      }
+    }
+    sleep_ms(50);
+  }
+  return -1;
+}
+
+
+
+
 int client_run(void) {
   Client c;
   memset(&c, 0, sizeof(c));
@@ -264,25 +292,30 @@ int client_run(void) {
       int world = ui_prompt_int("World: 0=NO_OBS, 1=OBS_FILE", 0);
       char map_path[MAP_PATH_MAX]; map_path[0] = '\0';
       if (world == OBS_FILE) {
-        ui_prompt_str("Cesta k mape", map_path, MAP_PATH_MAX, "../maps/example1.txt");
+        ui_prompt_str("Cesta k mape", map_path, MAP_PATH_MAX, "maps/example1.txt");
       }
       int maxp = ui_prompt_int("Max hracov", 4);
 
-      spawn_server_process(w, h, mode ? TIMED : STANDARD, time_s, world ? OBS_FILE : NO_OBS, map_path, maxp);
+      
+int server_pid = -1;
+if (spawn_server_process(w, h, mode ? TIMED : STANDARD, time_s,
+                         world ? OBS_FILE : NO_OBS, map_path, maxp,
+                         &server_pid) != 0) {
+  clear(); mvprintw(2,2,"Nepodarilo sa spustit server proces."); refresh();
+  sleep_ms(800);
+  continue;
+}
 
-      sleep_ms(200);
-      ServerInfo list[32];
-      int n = reg_list(list, 32);
+int port = find_port_by_server_pid(server_pid);
+if (port <= 0) {
+  clear(); mvprintw(2,2,"Neviem najst server v registry (pid=%d).", server_pid); refresh();
+  sleep_ms(1200);
+  continue;
+}
 
-      int port = -1;
-      if (n > 0) {
-        port = list[n - 1].port;
-      }
-      if (port <= 0) {
-        clear(); mvprintw(2,2,"Neviem najst server v registry."); refresh();
-        sleep_ms(800);
-        continue;
-      }
+
+
+
 
       if (connect_and_join(&c, port) != 0) {
         clear(); mvprintw(2,2,"Nepodarilo sa pripojit k serveru (port %d).", port); refresh();
@@ -298,6 +331,10 @@ int client_run(void) {
       int port = 0;
       if (n > 0) {
         clear();
+        mvprintw(2,2,"Dostupne hry:");
+        for (int i = 0; i < n; i++) {
+          mvprintw(4+i, 2, "%d) pid=%d port=%d", i+1, list[i].pid, list[i].port);
+        }
         refresh();
         port = ui_prompt_int("Zadaj port (alebo skopiruj z listu)", list[0].port);
       } else {
