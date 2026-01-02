@@ -1,0 +1,4 @@
+/mnt/c/Users/filip/Downloads/snake-ipc (1)/snake-ipc/build/CMakeFiles/server.dir
+/mnt/c/Users/filip/Downloads/snake-ipc (1)/snake-ipc/build/CMakeFiles/client.dir
+/mnt/c/Users/filip/Downloads/snake-ipc (1)/snake-ipc/build/CMakeFiles/edit_cache.dir
+/mnt/c/Users/filip/Downloads/snake-ipc (1)/snake-ipc/build/CMakeFiles/rebuild_cache.dir
