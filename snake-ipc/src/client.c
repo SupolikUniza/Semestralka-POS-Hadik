@@ -253,7 +253,7 @@ static void draw_game_from_snapshot(const Msg* s, int my_pid) {
 
 
 static int find_port_by_server_pid(int server_pid) {
-  /* cakáme max ~3 sekundy, kým server zapíše PID+port do registry */
+  /* cakï¿½me max ~3 sekundy, kï¿½m server zapï¿½e PID+port do registry */
   for (int tries = 0; tries < 60; tries++) {   // 60 * 50ms = 3000ms
     ServerInfo list[64];
     int n = reg_list(list, 64);
@@ -335,14 +335,15 @@ if (port <= 0) {
         for (int i = 0; i < n; i++) {
           mvprintw(4+i, 2, "%d) pid=%d port=%d", i+1, list[i].pid, list[i].port);
         }
-        refresh();
         port = ui_prompt_int("Zadaj port (alebo skopiruj z listu)", list[0].port);
+        refresh();
       } else {
         port = ui_prompt_int("Zadaj port servera", 0);
       }
 
       if (connect_and_join(&c, port) != 0) {
-        clear(); mvprintw(2,2,"Nepodarilo sa pripojit k serveru (port %d).", port); refresh();
+        clear(); 
+        mvprintw(2,2,"Nepodarilo sa pripojit k serveru (port %d).", port); refresh();
         sleep_ms(800);
         continue;
       }
