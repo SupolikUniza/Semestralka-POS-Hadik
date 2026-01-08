@@ -70,7 +70,7 @@ static int ui_prompt_int(const char* label, int defv) {
 static int ui_prompt_int_without_clear(const char* label, int defv) {
   echo();
   nodelay(stdscr, FALSE);
-  curs_set(1);
+  curs_set(1);  
 
   //clear();
   mvprintw(2, 2, "%s (default %d): ", label, defv);
@@ -291,6 +291,32 @@ static int find_port_by_server_pid(int server_pid) {
 }
 
 
+static int ui_pause_menu(void) {
+  nodelay(stdscr, FALSE);   // blokuj vstup
+  echo();                   // alebo noecho(); je jedno, nič nezadávaš text
+  noecho();
+  curs_set(0);
+
+  clear();
+  ui_draw_center("PAUZA", 2);
+  ui_draw_center("1) Pokracovat", 5);
+  ui_draw_center("2) Nova hra", 6);
+  ui_draw_center("3) Odísť z hry", 7);
+  ui_draw_center("Stlac 1/2/3", 10);
+  refresh();
+
+  for (;;) {
+    int ch = getch();
+    if (ch == '1') { nodelay(stdscr, TRUE); return 1; }
+    if (ch == '2') { nodelay(stdscr, TRUE); return 2; }
+    if (ch == '3' || ch == 'q' || ch == 'Q') { nodelay(stdscr, TRUE); return 3; }
+  }
+}
+
+
+
+
+
 
 
 int client_run(void) {
@@ -300,9 +326,11 @@ int client_run(void) {
   pthread_mutex_init(&c.mx, NULL);
 
   ui_init();
+  int next_choice = 0;
 
   for (;;) {
-    int choice = ui_menu();
+    int choice = (next_choice != 0) ? next_choice : ui_menu();
+    next_choice = 0;
     if (choice == 3) break;
 
     if (choice == 1) {
@@ -357,7 +385,7 @@ if (port <= 0) {
           mvprintw(4+i, 2, "%d)  port=%d", i+1, list[i].port);
         }
         refresh();
-        port = ui_prompt_int_2("Zadaj port", list[0].port);
+        port = ui_prompt_int_without_clear("Zadaj port", list[0].port);
       } else {
         port = ui_prompt_int("Zadaj port servera", 0);
       }
@@ -379,8 +407,26 @@ if (port <= 0) {
       else if (ch == KEY_LEFT || ch == 'a' || ch == 'A') send_input(&c, LEFT);
       else if (ch == KEY_RIGHT || ch == 'd' || ch == 'D') send_input(&c, RIGHT);
       else if (ch == 'p' || ch == 'P') {
-        if (!c.paused) { send_simple(&c, PAUSE); c.paused = 1; }
-        else { send_simple(&c, RESUME); c.paused = 0; }
+        if (!c.paused) {
+          send_simple(&c, PAUSE);
+          c.paused = 1;
+        }
+      
+        int pm = ui_pause_menu();
+        if (pm == 1) {
+          send_simple(&c, RESUME);
+          c.paused = 0;
+        } else if (pm == 2) {
+          // Nova hra => hadik musi zmiznut
+          send_simple(&c, LEAVE);
+          next_choice = 1;   // hned spusti flow "Nova hra"
+          break;
+        } else {
+          // Ukoncit
+          send_simple(&c, LEAVE);
+          //next_choice = 3;   // ukonci aplikaciu
+          break;
+        }
       } else if (ch == 'r' || ch == 'R') {
         send_simple(&c, RESPAWN);
       } else if (ch == 'q' || ch == 'Q') {
