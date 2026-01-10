@@ -27,6 +27,7 @@ enum MsgType {
   RESPAWN,
   LEAVE,
   SNAPSHOT,
+  SCOREBOARD,
   GAME_END
 };
 

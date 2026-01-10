@@ -432,11 +432,42 @@ static void handle_resume(Game* g, int pid) {
   g->players[pid].resume_at = now_ms() + 3000;
 }
 
+static void send_scoreboard(Game* g, int fd, int leaving_pid) {
+  Msg m;
+  memset(&m, 0, sizeof(m));
+  m.type = SCOREBOARD;
+
+  int off = 0;
+  int n = 0;
+
+  
+  off += (int)sizeof(int);
+
+  for (int i = 0; i < MAX_PLAYERS; i++) {
+    if (!g->players[i].used) continue;
+
+    
+    int pid = i;
+    int sc  = g->players[i].score;
+
+    memcpy(m.data + off, &pid, (int)sizeof(int)); off += (int)sizeof(int);
+    memcpy(m.data + off, &sc,  (int)sizeof(int)); off += (int)sizeof(int);
+    n++;
+  }
+
+  memcpy(m.data, &n, (int)sizeof(int));
+  m.len = off;
+
+  net_send_msg(fd, &m);
+}
+
+
 static void handle_leave(Game* g, int pid) {
   if (pid < 0 || pid >= MAX_PLAYERS) return;
   if (!g->players[pid].used) return;
 
   if (g->players[pid].fd >= 0) {
+    send_scoreboard(g, g->players[pid].fd, pid);
     close(g->players[pid].fd);
     g->players[pid].fd = -1;
   }
@@ -450,6 +481,9 @@ static void handle_leave(Game* g, int pid) {
 static void handle_respawn(Game* g, int pid) {
   if (pid < 0 || pid >= MAX_PLAYERS) return;
   if (!g->players[pid].used) return;
+
+  g->players[pid].score = 0;
+  g->players[pid].alive_ms = 0; 
 
   snake_spawn(g, pid);
   g->freeze_until = now_ms() + 3000;

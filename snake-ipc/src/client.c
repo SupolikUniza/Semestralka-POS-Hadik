@@ -218,6 +218,22 @@ static void* net_thread(void* arg) {
         c->final_scores[i] = sc;
       }
       c->game_end = 1;
+    } else if (m.type == SCOREBOARD) {
+      int off = 0;
+      int n = 0;
+      memcpy(&n, m.data + off, sizeof(int)); off += (int)sizeof(int);
+      if (n < 0) n = 0;
+      if (n > 8) n = 8;
+    
+      c->sb_n = n;
+      for (int i = 0; i < n; i++) {
+        int pid = 0, sc = 0;
+        memcpy(&pid, m.data + off, sizeof(int)); off += (int)sizeof(int);
+        memcpy(&sc,  m.data + off, sizeof(int)); off += (int)sizeof(int);
+        c->sb_pid[i] = pid;
+        c->sb_score[i] = sc;
+      }
+      c->has_scoreboard = 1;
     }
     pthread_mutex_unlock(&c->mx);
   }
@@ -431,6 +447,13 @@ if (port <= 0) {
         send_simple(&c, RESPAWN);
       } else if (ch == 'q' || ch == 'Q') {
         send_simple(&c, LEAVE);
+        for (int i = 0; i < 25; i++) {   // 25 * 20ms = 500ms
+          pthread_mutex_lock(&c.mx);
+          int got = c.has_scoreboard;
+          pthread_mutex_unlock(&c.mx);
+          if (got) break;
+          sleep_ms(20);
+        }
         break;
       }
 
@@ -465,15 +488,49 @@ if (port <= 0) {
 
       sleep_ms(20);
     }
+/* 1) zavri socket aby sa net_thread odblokoval */
+if (c.fd >= 0) close(c.fd);
+c.fd = -1;
 
-    if (c.fd >= 0) close(c.fd);
-    c.fd = -1;
-    c.connected = 0;
-    c.has_snapshot = 0;
-    c.game_end = 0;
-    c.paused = 0;
+/* 2) pockaj na net_thread */
+pthread_join(th, NULL);
 
-    pthread_join(th, NULL);
+/* 3) teraz je safe precitat scoreboard */
+pthread_mutex_lock(&c.mx);
+int has_sb = c.has_scoreboard;
+int sb_n = c.sb_n;
+int sb_pid[8];
+int sb_score[8];
+for (int i = 0; i < sb_n && i < 8; i++) {
+  sb_pid[i] = c.sb_pid[i];
+  sb_score[i] = c.sb_score[i];
+}
+pthread_mutex_unlock(&c.mx);
+
+if (has_sb) {
+  clear();
+  mvprintw(2, 2, "Skore pri odchode:");
+  for (int i = 0; i < sb_n && i < 8; i++) {
+    mvprintw(4 + i, 2, "P%d score=%d", sb_pid[i] + 1, sb_score[i]);
+  }
+  mvprintw(6 + sb_n, 2, "Stlac lubovolnu klavesu...");
+  nodelay(stdscr, FALSE);
+  getch();
+  nodelay(stdscr, TRUE);
+}
+
+/* 4) az teraz resetuj stav klienta */
+c.has_snapshot = 0;
+c.game_end = 0;
+c.paused = 0;
+
+c.has_scoreboard = 0;
+c.sb_n = 0;
+
+/* c.connected tu kludne nemusis nastavovat vobec */
+c.connected = 0;
+
+    
   }
 
   ui_end();

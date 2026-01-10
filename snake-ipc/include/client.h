@@ -17,6 +17,12 @@ typedef struct {
   long final_ms;
   int final_scores[8];
 
+  int has_scoreboard;
+  int sb_n;
+  int sb_pid[8];
+  int sb_score[8];
+
+
   pthread_mutex_t mx;
 } Client;
 
